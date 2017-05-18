@@ -5,9 +5,9 @@ Data = []
 import sys
 import copy
 #import mnist
-Epochs = 100
+Epochs = 10
 TrainingPortion = 0.9
-
+MnistSize = 1000
 
 class Perceptron:
     def __init__(self, num_inputs, eta):
@@ -17,7 +17,7 @@ class Perceptron:
         self.eta = eta
 
     def copy(self):
-        p = Perceptron(len(self.weights)-1)
+        p = Perceptron(len(self.weights)-1, self.eta)
         for i in range(len(self.weights)):
             p.weights[i] = self.weights[i]
         return p
@@ -46,7 +46,8 @@ class Perceptron:
         total = 0.0
         for i in range(len(self.weights)):
             total += self.weights[i] * inputs[i]
-        return total
+        sigmoid = 1/(1 + np.exp(total))
+        return sigmoid
 
     def listWeights(self):
         for i in range(len(self.weights)):
@@ -56,12 +57,14 @@ class Perceptron:
 
 
 class Numimg:
-    def __init__(self, data = ""):
-        self.label = data[0]
-        temp = data[1:].split("\n")  # like firewood
-        self.Array = []
-        for i in temp:
-            self.Array.append(i.split(" ")[1:])  # because
+    def __init__(self, label, array):
+        #self.label = data[0]
+        #temp = data[1:].split("\n")  # like firewood
+        #self.Array = []
+        #for i in temp:
+        #    self.Array.append(i.split(" ")[1:])  # because
+        self.label = label
+        self.Array = array
         self.rows = len(self.Array)
         self.cols = len(self.Array[0])
         num_ones = self.num_ones()
@@ -85,7 +88,7 @@ class Numimg:
         counter = 0
         for i in self.Array:
             for j in i:
-                if(j == '1'):
+                if(j != '0'):
                     counter += 1
 
         return counter
@@ -175,31 +178,51 @@ def printData():
 
 
 class NeuralNet:
-    def __init__(self, inputs, input_layer_size, hidden_layer_size, outputs, eta):
+    def __init__(self, inputs = 0, input_layer_size = 0, hidden_layer_size = 0, outputs = 0, eta = 0):
         self.num_inputs = inputs
         self.L1_size = input_layer_size
         self.L2_size = hidden_layer_size
         self.L3_size = outputs
+        self.eta = eta
         self.L1 = []
         self.L2 = []
         self.L3 = []
         for i in range(input_layer_size):
-            self.L1.append(Perceptron(inputs))
+            self.L1.append(Perceptron(inputs, self.eta))
         for i in range(hidden_layer_size):
-            self.L2.append(Perceptron(input_layer_size))
+            self.L2.append(Perceptron(input_layer_size, self.eta))
         for i in range(outputs):
-            self.L3.append(Perceptron(hidden_layer_size))
+            self.L3.append(Perceptron(hidden_layer_size, self.eta))
+
+    def copy(self):
+        #nn = NeuralNet(self.num_inputs, self.L1_size, self.L2_size, self.L3_size, self.eta)
+        nn = NeuralNet()
+        for i in self.L1:
+            nn.L1.append(i.copy())
+        for i in self.L2:
+            nn.L2.append(i.copy())
+        for i in self.L3:
+            nn.L3.append(i.copy())
+
+        nn.num_inputs = self.num_inputs
+        nn.L1_size = self.L1_size
+        nn.L2_size = self.L2_size
+        nn.L3_size = self.L3_size
+        nn.eta = self.eta
+        return nn
 
     def run_forward(self, input, isTraining):
-        if len(input) != self.num_inputs:
+        if len(input) != self.num_inputs + 1:
             print("Wrong number of inputs for neural network, expected", self.num_inputs, "got", len(input))
         L1_outputs = [0.0]*self.L1_size
         L2_outputs = [0.0]*self.L2_size
         L3_outputs = [0.0]*self.L3_size
         for i in range(self.L1_size):
             L1_outputs[i] = self.L1[i].predict(input)
+        L1_outputs.insert(0, -1)
         for i in range(self.L2_size):
             L2_outputs[i] = self.L2[i].predict(L1_outputs)
+        L2_outputs.insert(0, -1)
         for i in range(self.L3_size):
             L3_outputs[i] = self.L3[i].predict(L2_outputs)
         if not isTraining:
@@ -216,25 +239,25 @@ class NeuralNet:
         for i in range(self.L3_size):
             L3_error[i] = (expected[i] - L3_outputs[i])*L3_outputs[i]*(1-L3_outputs[i])
 
-        for i in range(self.L2_sizeL):
+        for i in range(self.L2_size):
             sum = 0.0
             for j in range(self.L3_size):
                 sum += self.L3[j].weights[i] * L3_error[j]
-            L2_error[i] = (L2_outputs[i] * sum)
+            L2_error[i] = (L2_outputs[i+1] * sum)
 
         for i in range(self.L1_size):  # identical to above
             sum = 0.0
             for j in range(self.L2_size):
                 sum += self.L2[j].weights[i] * L2_error[j]
-            L1_error[i] = (L1_outputs[i] * sum)
+            L1_error[i] = (L1_outputs[i+1] * sum)
 
         # should have error for everything now. Now to update values
         for i in range(self.L3_size):  # update output layer
-            self.L3[i].train(L2_outputs, L3_error)
+            self.L3[i].train(L2_outputs, L3_error[i])
         for i in range(self.L2_size):  # update hidden layer
-            self.L2[i].train(L1_outputs, L2_error)
+            self.L2[i].train(L1_outputs, L2_error[i])
         for i in range(self.L1_size):  # update input layer
-            self.L1[i].train(input, L1_error)
+            self.L1[i].train(input, L1_error[i])
 
     def train(self, input, expectedout):
         L1out, L2out, L3out = self.run_forward(input, True)
@@ -245,8 +268,9 @@ class NeuralNet:
         return output
 
 def main():
-    #global Epochs
-    #global TrainingPortion
+    global MnistSize
+    global Epochs
+    global TrainingPortion
     #global Data
     #ErrorArray = []
     #PArray = []
@@ -286,7 +310,53 @@ def main():
     #print("This results in", BestError, "Errors out of", len(Data) - TrainingSize, "Test Cases")
     #print("Which is an accuracy of", round(1 - (BestError/(len(Data) - TrainingSize)), 2))
     #return 0
-    array = getData()
+    dataArray = getData()
+    dataSize = MnistSize #len(dataArray)
+    trainingSize = int(dataSize * TrainingPortion)
+    testingSize = dataSize - trainingSize
+    trainingArray = []
+    testingArray = []
+    for i in range(0,trainingSize):
+        label = dataArray[i][0]
+        array = dataArray[i][1]
+        trainingArray.append(Numimg(label, array))
+    for i in range(trainingSize, dataSize):
+        label = dataArray[i][0]
+        array = dataArray[i][1]
+        testingArray.append(Numimg(label, array))
+    CurrNeuralNet = NeuralNet(7, 10, 10, 10, 0.15)
+    ErrorArray = []
+    NetArray = [] #temp
+    BestNeuralNet = CurrNeuralNet.copy()
+    BestError = sys.maxsize #number it got wrong
+    for epoch in range(Epochs):
+        print("Begining epoch", epoch)
+        random.shuffle(trainingArray)  # shuffling order in which training takes place per ravi's recommendation
+        for i in range(trainingSize):
+            expectedOutput = [0]*10
+            expectedOutput[trainingArray[i].label] = 1
+            CurrNeuralNet.train(trainingArray[i].inputs(), expectedOutput)
+        CurrError = 0
+        for i in range(testingSize):
+            outputs = CurrNeuralNet.test(testingArray[i].inputs())
+            for j in range(10):
+                if testingArray[i].label == j and outputs[j] <= 0.5:
+                    CurrError += 1
+                    break
+                if testingArray[i].label != j and outputs[j] > 0.5:
+                    CurrError += 1
+                    break
+        if CurrError < BestError:
+            BestError = CurrError
+            BestNeuralNet = CurrNeuralNet.copy()
+        ErrorArray.append(CurrError)
+        NetArray.append(CurrNeuralNet.copy())
+    print(ErrorArray)
+
+
+    datalength = len(dataArray)
+
+
     print("hell")
 
 
