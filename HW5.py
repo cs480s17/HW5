@@ -1,14 +1,20 @@
 import struct
+import random
 import numpy as np
 Data = []
 import sys
 import copy
-import mnist
+#import mnist
 Epochs = 100
 TrainingPortion = 0.9
+
+
 class Perceptron:
-    def __init__(self, num_inputs):
-        self.weights = [1]*(num_inputs+1) #+1 is for W0, the threshold weight
+    def __init__(self, num_inputs, eta):
+        self.weights = [0.0]*(num_inputs + 1)  # +1 is for W0, the threshold weight
+        for i in range(num_inputs + 1):  # randomize all weights
+            self.weights[i] = random.uniform(-0.1, 0.1)
+        self.eta = eta
 
     def copy(self):
         p = Perceptron(len(self.weights)-1)
@@ -16,21 +22,28 @@ class Perceptron:
             p.weights[i] = self.weights[i]
         return p
 
-    def learn(self, inputs, correct_output, Eta):
+    def learn(self, inputs, correct_output):  # useful for training single perceptron, not so much for neural net
         prediction = self.predict(inputs)
-        if prediction * correct_output <= 0: #if prediction and the correct output have a different sign:
+        if prediction * correct_output <= 0:  # if prediction and the correct output have a different sign:
             for i in range(len(self.weights)):
-                new = self.weights[i] - (Eta * (prediction - correct_output) * inputs[i])
+                new = self.weights[i] - (self.eta * (prediction - correct_output) * inputs[i])
                 self.weights[i] = new
         else:
             return
 
+    def train(self, inputs, error):  # used by neural net
+        for i in range(len(self.weights)):
+            new = self.weights[i] + (self.eta * error * inputs[i])
+            self.weights[i] = new
+        return
+
     def test(self, inputs, correct_output):
         prediction = self.predict(inputs)
-        return not(prediction * correct_output <= 0)  # if prediction and the correct output have a different sign, return false
+        return not(prediction * correct_output <= 0)
+        # if prediction and the correct output have a different sign, return false
 
-    def predict(self, inputs):
-        total = 0
+    def predict(self, inputs): #remember to always have threshold input as -1
+        total = 0.0
         for i in range(len(self.weights)):
             total += self.weights[i] * inputs[i]
         return total
@@ -45,10 +58,10 @@ class Perceptron:
 class Numimg:
     def __init__(self, data = ""):
         self.label = data[0]
-        temp = data[1:].split("\n") #like firewood
+        temp = data[1:].split("\n")  # like firewood
         self.Array = []
         for i in temp:
-            self.Array.append(i.split(" ")[1:]) #because
+            self.Array.append(i.split(" ")[1:])  # because
         self.rows = len(self.Array)
         self.cols = len(self.Array[0])
         num_ones = self.num_ones()
@@ -99,7 +112,7 @@ class Numimg:
         for i in range(self.rows):
             count = 0
             prev = '0'
-            for j in range(self.cols): #following will count the number of 1 to 0 borders in current row
+            for j in range(self.cols):  # following will count the number of 1 to 0 borders in current row
                 curr = self.Array[i][j]
                 if prev != curr:
                     if prev == '1':
@@ -117,7 +130,7 @@ class Numimg:
         for i in range(self.cols):
             count = 0
             prev = '0'
-            for j in range(self.rows): #following will count the number of 1 to 0 borders in current col
+            for j in range(self.rows):  # following will count the number of 1 to 0 borders in current col
                 curr = self.Array[j][i]
                 if prev != curr:
                     if prev == '1':
@@ -140,9 +153,6 @@ class Numimg:
                 self.max_v_intercepts]
 
 
-
-
-
 def parseData():
     global Data
     global cols, rows
@@ -157,13 +167,15 @@ def parseData():
     for i in dataarray:
         Data.append(Numimg(i)) #you know it
 
+
 def printData():
     global Data
     for i in Data:
         i.print()
 
+
 class NeuralNet:
-    def __init__(self, inputs, input_layer_size, hidden_layer_size, outputs ):
+    def __init__(self, inputs, input_layer_size, hidden_layer_size, outputs, eta):
         self.num_inputs = inputs
         self.L1_size = input_layer_size
         self.L2_size = hidden_layer_size
@@ -178,25 +190,59 @@ class NeuralNet:
         for i in range(outputs):
             self.L3.append(Perceptron(hidden_layer_size))
 
-    def run_forward(self, input):
+    def run_forward(self, input, isTraining):
         if len(input) != self.num_inputs:
             print("Wrong number of inputs for neural network, expected", self.num_inputs, "got", len(input))
-        L1_outputs = [0]*self.L1_size
-        L2_outputs = [0]*self.L2_size
-        L3_outputs = [0]*self.L3_size
+        L1_outputs = [0.0]*self.L1_size
+        L2_outputs = [0.0]*self.L2_size
+        L3_outputs = [0.0]*self.L3_size
         for i in range(self.L1_size):
             L1_outputs[i] = self.L1[i].predict(input)
         for i in range(self.L2_size):
             L2_outputs[i] = self.L2[i].predict(L1_outputs)
         for i in range(self.L3_size):
             L3_outputs[i] = self.L3[i].predict(L2_outputs)
-        return L3_outputs
+        if not isTraining:
+            return L3_outputs
+        else:
+            return L1_outputs, L2_outputs, L3_outputs
 
-    def
+    def run_backwards(self, input, L1_outputs, L2_outputs, L3_outputs, expected):
+        # compute error in each output neuron
+        L3_error = [0.0]*self.L3_size
+        L2_error = [0.0]*self.L2_size
+        L1_error = [0.0]*self.L1_size
 
+        for i in range(self.L3_size):
+            L3_error[i] = (expected[i] - L3_outputs[i])*L3_outputs[i]*(1-L3_outputs[i])
 
+        for i in range(self.L2_sizeL):
+            sum = 0.0
+            for j in range(self.L3_size):
+                sum += self.L3[j].weights[i] * L3_error[j]
+            L2_error[i] = (L2_outputs[i] * sum)
 
+        for i in range(self.L1_size):  # identical to above
+            sum = 0.0
+            for j in range(self.L2_size):
+                sum += self.L2[j].weights[i] * L2_error[j]
+            L1_error[i] = (L1_outputs[i] * sum)
 
+        # should have error for everything now. Now to update values
+        for i in range(self.L3_size):  # update output layer
+            self.L3[i].train(L2_outputs, L3_error)
+        for i in range(self.L2_size):  # update hidden layer
+            self.L2[i].train(L1_outputs, L2_error)
+        for i in range(self.L1_size):  # update input layer
+            self.L1[i].train(input, L1_error)
+
+    def train(self, input, expectedout):
+        L1out, L2out, L3out = self.run_forward(input, True)
+        self.run_backwards(input, L1out, L2out, L3out, expectedout)
+
+    def test(self, input):
+        output = self.run_forward(input, False)
+        return output
 
 def main():
     #global Epochs
@@ -246,7 +292,7 @@ def main():
 
 def getData():
 
-    #get training set
+    # get training set
     with open('train-labels-idx1-ubyte','rb') as fl:
         magic,num = struct.unpack(">II",fl.read(8))
         label = np.fromfile(fl,dtype=np.int8)
