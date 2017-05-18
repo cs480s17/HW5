@@ -46,7 +46,7 @@ class Perceptron:
         total = 0.0
         for i in range(len(self.weights)):
             total += self.weights[i] * inputs[i]
-        sigmoid = 1/(1 + np.exp(total))
+        sigmoid = 1/(1 + np.exp(-total))
         return sigmoid
 
     def listWeights(self):
@@ -114,13 +114,13 @@ class Numimg:
         max = 0
         for i in range(self.rows):
             count = 0
-            prev = '0'
+            prevIs0 = True  # prev = '0'
             for j in range(self.cols):  # following will count the number of 1 to 0 borders in current row
                 curr = self.Array[i][j]
-                if prev != curr:
-                    if prev == '1':
+                if prevIs0 != (curr == 0):  # if prev != curr:
+                    if not prevIs0:
                         count += 1
-                    prev = curr
+                    prevIs0 = (curr == 0)  # True if curr == 0
             if count < min:
                 min = count
             if count > max:
@@ -132,13 +132,13 @@ class Numimg:
         max = 0
         for i in range(self.cols):
             count = 0
-            prev = '0'
+            prevIs0 = True  # prev = '0'
             for j in range(self.rows):  # following will count the number of 1 to 0 borders in current col
                 curr = self.Array[j][i]
-                if prev != curr:
-                    if prev == '1':
+                if prevIs0 != (curr == 0):
+                    if not prevIs0:
                         count += 1
-                    prev = curr
+                    prevIs0 = (curr == 0)  # True if curr == 0
             if count < min:
                 min = count
             if count > max:
@@ -237,18 +237,20 @@ class NeuralNet:
         L1_error = [0.0]*self.L1_size
 
         for i in range(self.L3_size):
+            #if():  # output is incorrect
             L3_error[i] = (expected[i] - L3_outputs[i])*L3_outputs[i]*(1-L3_outputs[i])
+
 
         for i in range(self.L2_size):
             sum = 0.0
             for j in range(self.L3_size):
-                sum += self.L3[j].weights[i] * L3_error[j]
+                sum += self.L3[j].weights[i+1] * L3_error[j]
             L2_error[i] = (L2_outputs[i+1] * sum)
 
         for i in range(self.L1_size):  # identical to above
             sum = 0.0
             for j in range(self.L2_size):
-                sum += self.L2[j].weights[i] * L2_error[j]
+                sum += self.L2[j].weights[i+1] * L2_error[j]
             L1_error[i] = (L1_outputs[i+1] * sum)
 
         # should have error for everything now. Now to update values
@@ -332,12 +334,12 @@ def main():
     for epoch in range(Epochs):
         print("Begining epoch", epoch)
         random.shuffle(trainingArray)  # shuffling order in which training takes place per ravi's recommendation
-        for i in range(trainingSize):
+        for i in range(trainingSize):  # training loop
             expectedOutput = [0]*10
             expectedOutput[trainingArray[i].label] = 1
             CurrNeuralNet.train(trainingArray[i].inputs(), expectedOutput)
         CurrError = 0
-        for i in range(testingSize):
+        for i in range(testingSize):  # testing loop
             outputs = CurrNeuralNet.test(testingArray[i].inputs())
             for j in range(10):
                 if testingArray[i].label == j and outputs[j] <= 0.5:
