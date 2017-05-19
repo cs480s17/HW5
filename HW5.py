@@ -5,42 +5,44 @@ Data = []
 import sys
 import copy
 #import mnist
-Epochs = 10
+Epochs = 50
 TrainingPortion = 0.9
 MnistSize = 1000
+Eta = 0.15
+HiddenLayerSize = 50
 
 class Perceptron:
-    def __init__(self, num_inputs, eta):
+    def __init__(self, num_inputs):
         self.weights = [0.0]*(num_inputs + 1)  # +1 is for W0, the threshold weight
         for i in range(num_inputs + 1):  # randomize all weights
             self.weights[i] = random.uniform(-0.1, 0.1)
-        self.eta = eta
+
 
     def copy(self):
-        p = Perceptron(len(self.weights)-1, self.eta)
+        p = Perceptron(len(self.weights)-1)
         for i in range(len(self.weights)):
             p.weights[i] = self.weights[i]
         return p
 
-    def learn(self, inputs, correct_output):  # useful for training single perceptron, not so much for neural net
-        prediction = self.predict(inputs)
-        if prediction * correct_output <= 0:  # if prediction and the correct output have a different sign:
-            for i in range(len(self.weights)):
-                new = self.weights[i] - (self.eta * (prediction - correct_output) * inputs[i])
-                self.weights[i] = new
-        else:
-            return
+    #def learn(self, inputs, correct_output):  # useful for training single perceptron, not so much for neural net
+    #    prediction = self.predict(inputs)
+    #    if prediction * correct_output <= 0:  # if prediction and the correct output have a different sign:
+    #        for i in range(len(self.weights)):
+    #            new = self.weights[i] - (0.15 * (prediction - correct_output) * inputs[i])
+    #            self.weights[i] = new
+    #    else:
+    #        return
 
-    def train(self, inputs, error):  # used by neural net
+    def train(self, inputs, error, eta):  # used by neural net
         for i in range(len(self.weights)):
-            new = self.weights[i] + (self.eta * error * inputs[i])
+            new = self.weights[i] + (eta * error * inputs[i])
             self.weights[i] = new
         return
 
-    def test(self, inputs, correct_output):
-        prediction = self.predict(inputs)
-        return not(prediction * correct_output <= 0)
-        # if prediction and the correct output have a different sign, return false
+    #def test(self, inputs, correct_output):
+    #    prediction = self.predict(inputs)
+    #    return not(prediction * correct_output <= 0)
+    #    # if prediction and the correct output have a different sign, return false
 
     def predict(self, inputs): #remember to always have threshold input as -1
         total = 0.0
@@ -48,6 +50,7 @@ class Perceptron:
             total += self.weights[i] * inputs[i]
         sigmoid = 1/(1 + np.exp(-total))
         return sigmoid
+
 
     def listWeights(self):
         for i in range(len(self.weights)):
@@ -71,24 +74,32 @@ class Numimg:
         self.density = num_ones / (self.rows * self.cols)
         self.h_symmetry = self.__h_symmetry__() / num_ones
         self.v_symmetry = self.__v_symmetry__() / num_ones
-        self.min_h_intercepts, self.max_h_intercepts = self.__h_intercepts__()
-        self.min_v_intercepts, self.max_v_intercepts = self.__v_intercepts__()
+        self.max_h_intercepts = self.__h_intercepts__()
+        self.max_v_intercepts = self.__v_intercepts__()
+        self.__toBinaryArray__()
+        self.gridIntensities = self.__gridIntensities__()
 
-    def print(self):
-        print("Label:", self.label)
-        print("density:", self.density)
-        print("h_symmetry:", self.h_symmetry)
-        print("v_symmetry:", self.v_symmetry)
-        print("h intercepts(min,max):", self.min_h_intercepts, self.max_h_intercepts)
-        print("v intercepts(min,max):", self.min_v_intercepts, self.max_v_intercepts)
-        for i in self.Array:
-            print(i)
+    #def print(self):
+    #    print("Label:", self.label)
+    #    print("density:", self.density)
+    #    print("h_symmetry:", self.h_symmetry)
+    #    print("v_symmetry:", self.v_symmetry)
+    #    print("h intercepts(max):", self.max_h_intercepts)
+    #    print("v intercepts(max):", self.max_v_intercepts)
+    #    for i in self.Array:
+    #        print(i)
+
+    def __toBinaryArray__(self):
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.Array[i][j] != 0:
+                    self.Array[i][j] = 1
 
     def num_ones(self):
         counter = 0
         for i in self.Array:
             for j in i:
-                if(j != '0'):
+                if(j != 0):
                     counter += 1
 
         return counter
@@ -125,7 +136,7 @@ class Numimg:
                 min = count
             if count > max:
                 max = count
-        return min, max
+        return max
 
     def __v_intercepts__(self):
         min = sys.maxsize
@@ -143,17 +154,28 @@ class Numimg:
                 min = count
             if count > max:
                 max = count
-        return min, max
+        return max
+
+    def __gridIntensities__(self):
+        if(self.rows != 28 or self.cols != 28):
+            print('MNIST data has wrong number of rows and columns. Expected 28x28, instead got '
+                  + str(self.rows) + 'x' + str(self.cols))
+            return []
+        gridIntensities = []
+        for gi in range(4):
+            for gj in range(4):
+                total = 0
+                for i in range(7):
+                    for j in range(7):
+                        total += self.Array[7*gi + i][7*gj + j]
+                gridIntensities.append(total)
+        return gridIntensities
 
     def inputs(self):
-        return [-1,
-                self.density,
-                self.h_symmetry,
-                self.v_symmetry,
-                self.min_h_intercepts,
-                self.max_h_intercepts,
-                self.min_v_intercepts,
-                self.max_v_intercepts]
+        features = [-1, self.density, self.h_symmetry, self.v_symmetry, self.max_h_intercepts, self.max_v_intercepts]
+        features.extend(self.gridIntensities)
+        return features
+        #return self.gridIntensities
 
 
 def parseData():
@@ -171,28 +193,27 @@ def parseData():
         Data.append(Numimg(i)) #you know it
 
 
-def printData():
-    global Data
-    for i in Data:
-        i.print()
+#def printData():
+#    global Data
+#    for i in Data:
+#        i.print()
 
 
 class NeuralNet:
-    def __init__(self, inputs = 0, input_layer_size = 0, hidden_layer_size = 0, outputs = 0, eta = 0):
+    def __init__(self, inputs=0, input_layer_size=0, hidden_layer_size=0, outputs=0):
         self.num_inputs = inputs
         self.L1_size = input_layer_size
         self.L2_size = hidden_layer_size
         self.L3_size = outputs
-        self.eta = eta
         self.L1 = []
         self.L2 = []
         self.L3 = []
         for i in range(input_layer_size):
-            self.L1.append(Perceptron(inputs, self.eta))
+            self.L1.append(Perceptron(inputs))
         for i in range(hidden_layer_size):
-            self.L2.append(Perceptron(input_layer_size, self.eta))
+            self.L2.append(Perceptron(input_layer_size))
         for i in range(outputs):
-            self.L3.append(Perceptron(hidden_layer_size, self.eta))
+            self.L3.append(Perceptron(hidden_layer_size))
 
     def copy(self):
         #nn = NeuralNet(self.num_inputs, self.L1_size, self.L2_size, self.L3_size, self.eta)
@@ -208,7 +229,6 @@ class NeuralNet:
         nn.L1_size = self.L1_size
         nn.L2_size = self.L2_size
         nn.L3_size = self.L3_size
-        nn.eta = self.eta
         return nn
 
     def run_forward(self, input, isTraining):
@@ -230,7 +250,7 @@ class NeuralNet:
         else:
             return L1_outputs, L2_outputs, L3_outputs
 
-    def run_backwards(self, input, L1_outputs, L2_outputs, L3_outputs, expected):
+    def run_backwards(self, input, L1_outputs, L2_outputs, L3_outputs, expected, eta):
         # compute error in each output neuron
         L3_error = [0.0]*self.L3_size
         L2_error = [0.0]*self.L2_size
@@ -255,15 +275,15 @@ class NeuralNet:
 
         # should have error for everything now. Now to update values
         for i in range(self.L3_size):  # update output layer
-            self.L3[i].train(L2_outputs, L3_error[i])
+            self.L3[i].train(L2_outputs, L3_error[i], eta)
         for i in range(self.L2_size):  # update hidden layer
-            self.L2[i].train(L1_outputs, L2_error[i])
+            self.L2[i].train(L1_outputs, L2_error[i], eta)
         for i in range(self.L1_size):  # update input layer
-            self.L1[i].train(input, L1_error[i])
+            self.L1[i].train(input, L1_error[i], eta)
 
-    def train(self, input, expectedout):
-        L1out, L2out, L3out = self.run_forward(input, True)
-        self.run_backwards(input, L1out, L2out, L3out, expectedout)
+    def train(self, inputs, expectedout, eta):
+        L1out, L2out, L3out = self.run_forward(inputs, True)
+        self.run_backwards(inputs, L1out, L2out, L3out, expectedout, eta)
 
     def test(self, input):
         output = self.run_forward(input, False)
@@ -273,93 +293,77 @@ def main():
     global MnistSize
     global Epochs
     global TrainingPortion
-    #global Data
-    #ErrorArray = []
-    #PArray = []
-    #parseData()
-    #TrainingSize = int(len(Data) * TrainingPortion)
-    #BestP = None
-    #BestError = sys.maxsize
-    #CurrP = Perceptron(7, 0.05)
-    #CurrError = 0
-    #for i in range(TrainingSize, len(Data)):
-    #    correct_out = (-1 if Data[i].label == '5' else 1)
-    #    if not (CurrP.test(Data[i].inputs(), correct_out)):
-    #        CurrError += 1
-    #ErrorArray.append(CurrError)
-    #PArray.append(CurrP.copy())
-    #if CurrError < BestError:
-    #    BestError = CurrError
-    #    BestP = CurrP.copy()
-    #for e in range(Epochs):
-    #    CurrError = 0
-    #    for i in range(TrainingSize):
-    #        correct_out = (-1 if Data[i].label == '5' else 1)
-    #        CurrP.learn(Data[i].inputs(), correct_out)
-#
-    #    for i in range(TrainingSize, len(Data)):
-    #        correct_out = (-1 if Data[i].label == '5' else 1)
-    #        if not(CurrP.test(Data[i].inputs(), correct_out)):
-    #            CurrError += 1
-    #    ErrorArray.append(CurrError)
-    #    PArray.append(CurrP.copy())
-    #    if CurrError < BestError:
-    #        BestError = CurrError
-    #        BestP = CurrP.copy()
-    #print("The best perceptron of", Epochs, "epochs has the following weights, where w0 is the threshold")
-    #BestP.listWeights()
-    #print()
-    #print("This results in", BestError, "Errors out of", len(Data) - TrainingSize, "Test Cases")
-    #print("Which is an accuracy of", round(1 - (BestError/(len(Data) - TrainingSize)), 2))
-    #return 0
+    global Eta
+    global HiddenLayerSize
+    if len(sys.argv) == 2:
+        HiddenLayerSize = int(sys.argv[1])
     dataArray = getData()
+
     dataSize = MnistSize #len(dataArray)
     trainingSize = int(dataSize * TrainingPortion)
     testingSize = dataSize - trainingSize
     trainingArray = []
     testingArray = []
+    print('extracting features for training set')
     for i in range(0,trainingSize):
         label = dataArray[i][0]
         array = dataArray[i][1]
         trainingArray.append(Numimg(label, array))
+    print('extracting features for test set')
     for i in range(trainingSize, dataSize):
         label = dataArray[i][0]
         array = dataArray[i][1]
         testingArray.append(Numimg(label, array))
-    CurrNeuralNet = NeuralNet(7, 10, 10, 10, 0.15)
+    thing = trainingArray[0].inputs()
+    numFeatures = len(thing) - 1
+    CurrNeuralNet = NeuralNet(numFeatures, HiddenLayerSize, HiddenLayerSize, 10)
     ErrorArray = []
     NetArray = [] #temp
     BestNeuralNet = CurrNeuralNet.copy()
     BestError = sys.maxsize #number it got wrong
-    for epoch in range(Epochs):
-        print("Begining epoch", epoch)
-        random.shuffle(trainingArray)  # shuffling order in which training takes place per ravi's recommendation
-        for i in range(trainingSize):  # training loop
-            expectedOutput = [0]*10
-            expectedOutput[trainingArray[i].label] = 1
-            CurrNeuralNet.train(trainingArray[i].inputs(), expectedOutput)
-        CurrError = 0
-        for i in range(testingSize):  # testing loop
-            outputs = CurrNeuralNet.test(testingArray[i].inputs())
-            for j in range(10):
-                if testingArray[i].label == j and outputs[j] <= 0.5:
+    BestEpoch = 0
+    while True:
+        for epoch in range(Epochs):
+            print("Begining epoch", epoch)
+            random.shuffle(trainingArray)  # shuffling order in which training takes place per ravi's recommendation
+            for i in range(trainingSize):  # training loop
+                expectedOutput = [0]*10
+                expectedOutput[trainingArray[i].label] = 1
+                CurrNeuralNet.train(trainingArray[i].inputs(), expectedOutput, Eta)
+            CurrError = 0
+            for i in range(testingSize):  # testing loop
+                outputs = CurrNeuralNet.test(testingArray[i].inputs())
+                maxval = 0.0
+                maxindex = 0
+                for j in range(10):
+                    if outputs[j] > maxval:
+                        maxval = outputs[j]
+                        maxindex = j
+                if testingArray[i].label != maxindex:
                     CurrError += 1
-                    break
-                if testingArray[i].label != j and outputs[j] > 0.5:
-                    CurrError += 1
-                    break
-        if CurrError < BestError:
-            BestError = CurrError
-            BestNeuralNet = CurrNeuralNet.copy()
-        ErrorArray.append(CurrError)
-        NetArray.append(CurrNeuralNet.copy())
-    print(ErrorArray)
+                #for j in range(10):
+                #    if testingArray[i].label == j and outputs[j] <= 0.5:
+                #        CurrError += 1
+                #        break
+                #    if testingArray[i].label != j and outputs[j] > 0.5:
+                #        CurrError += 1
+                #        break
+            print('Error is', CurrError)
+            if CurrError < BestError:
+                BestError = CurrError
+                BestNeuralNet = CurrNeuralNet.copy()
+                BestEpoch = epoch
+            ErrorArray.append(CurrError)
+            NetArray.append(CurrNeuralNet.copy())
+        print("Best Error is", BestError, "out of", testingSize, "at Epoch", BestEpoch)
+        print("That's an accuracy of", str(100*(1.0-float(BestError)/testingSize))+"%")
+        cont = input("continue?(y/n)")
+        if cont != 'y':
+            break
 
 
-    datalength = len(dataArray)
 
 
-    print("hell")
 
 
 def getData():
@@ -370,7 +374,7 @@ def getData():
         label = np.fromfile(fl,dtype=np.int8)
     with open('train-images-idx3-ubyte','rb') as fi:
         magic, num, rows, cols = struct.unpack(">IIII",fi.read(16))
-        image = np.fromfile(fi,dtype=np.uint8).reshape(len(label),rows,cols)
+        image = np.fromfile(fi,dtype=np.uint8).reshape(len(label), rows, cols)
         get_image = lambda idx: (label[idx],image[idx])
     ret = []
     for i in range(len(label)):
