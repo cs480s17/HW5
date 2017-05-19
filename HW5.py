@@ -8,7 +8,7 @@ import copy
 #import mnist
 Epochs = 50
 TrainingPortion = 0.9
-MnistSize = 200
+MnistSize = 1000
 Eta = 0.15
 HiddenLayerSize = 50
 
