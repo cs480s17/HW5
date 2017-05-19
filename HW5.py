@@ -1,3 +1,4 @@
+
 import struct
 import random
 import numpy as np
@@ -7,7 +8,7 @@ import copy
 #import mnist
 Epochs = 50
 TrainingPortion = 0.9
-MnistSize = 1000
+MnistSize = 200
 Eta = 0.15
 HiddenLayerSize = 50
 
@@ -322,9 +323,10 @@ def main():
     BestNeuralNet = CurrNeuralNet.copy()
     BestError = sys.maxsize #number it got wrong
     BestEpoch = 0
+    rounds = 0
     while True:
         for epoch in range(Epochs):
-            print("Begining epoch", epoch)
+            print("Begining epoch", Epochs * rounds + epoch)
             random.shuffle(trainingArray)  # shuffling order in which training takes place per ravi's recommendation
             for i in range(trainingSize):  # training loop
                 expectedOutput = [0]*10
@@ -352,14 +354,13 @@ def main():
             if CurrError < BestError:
                 BestError = CurrError
                 BestNeuralNet = CurrNeuralNet.copy()
-                BestEpoch = epoch
+                BestEpoch = Epochs * rounds + epoch
             ErrorArray.append(CurrError)
             NetArray.append(CurrNeuralNet.copy())
         print("Best Error is", BestError, "out of", testingSize, "at Epoch", BestEpoch)
         print("That's an accuracy of", str(100*(1.0-float(BestError)/testingSize))+"%")
-        cont = input("continue?(y/n)")
-        if cont != 'y':
-            break
+        input("continue?")
+        rounds += 1
 
 
 
@@ -382,4 +383,8 @@ def getData():
     return ret
 
 if __name__ == "__main__":
+    try:
+        input = raw_input
+    except NameError:
+        pass
     main()
